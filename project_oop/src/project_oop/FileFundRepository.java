@@ -137,4 +137,17 @@ public class FileFundRepository implements FundRepository {
         private final List<MonthlyPayment> payments = new ArrayList<>();
         private final List<MissionExpense> missions = new ArrayList<>();
     }
+    @Override
+    public void deleteStudent(String studentId) {
+        Objects.requireNonNull(studentId, "studentId must not be null");
+
+        boolean removed = data.students.removeIf(
+                student -> student.getStudentId().equals(studentId));
+
+        if (!removed) {
+            throw new IllegalArgumentException("ไม่พบรหัสนิสิตนี้");
+        }
+
+        saveData();
+    }
 }

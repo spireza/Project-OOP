@@ -11,273 +11,262 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Comparator;
 
 public class CsvFundRepository implements FundRepository {
 
-    private final Path dataDirectory;
+	private final Path dataDirectory;
 
-    private final List<Student> students = new ArrayList<>();
-    private final List<MonthlyPayment> payments = new ArrayList<>();
-    private final List<MissionExpense> missions = new ArrayList<>();
+	private final List<Student> students = new ArrayList<>();
+	private final List<MonthlyPayment> payments = new ArrayList<>();
+	private final List<MissionExpense> missions = new ArrayList<>();
 
-    public CsvFundRepository() {
-        this(Path.of("data"));
-    }
+	public CsvFundRepository() {
+		this(Path.of("data"));
+	}
 
-    public CsvFundRepository(Path dataDirectory) {
-        this.dataDirectory = Objects.requireNonNull(
-                dataDirectory, "dataDirectory must not be null");
+	public CsvFundRepository(Path dataDirectory) {
+		this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory must not be null");
 
-        students.addAll(readStudents());
-        payments.addAll(readPayments());
-        missions.addAll(readMissions());
-    }
+		students.addAll(readStudents());
+		payments.addAll(readPayments());
+		missions.addAll(readMissions());
+	}
 
-    @Override
-    public List<Student> findAllStudents() {
-        return new ArrayList<>(students);
-    }
+	@Override
+	public List<Student> findAllStudents() {
+		
+		List<Student> sortedStudents = new ArrayList<>(students);
+		sortedStudents.sort(Comparator.comparing(Student::getStudentId));
 
-    @Override
-    public List<MonthlyPayment> findPayments(int year) {
-        List<MonthlyPayment> result = new ArrayList<>();
+		return sortedStudents;
 
-        for (MonthlyPayment payment : payments) {
-            if (payment.getPeriod().getYear() == year) {
-                result.add(payment);
-            }
-        }
+	}
 
-        return result;
-    }
+	@Override
+	public List<MonthlyPayment> findPayments(int year) {
+		List<MonthlyPayment> result = new ArrayList<>();
 
-    @Override
-    public List<MissionExpense> findMissions(int year) {
-        List<MissionExpense> result = new ArrayList<>();
+		for (MonthlyPayment payment : payments) {
+			if (payment.getPeriod().getYear() == year) {
+				result.add(payment);
+			}
+		}
 
-        for (MissionExpense mission : missions) {
-            if (mission.getExpenseDate().getYear() == year) {
-                result.add(mission);
-            }
-        }
+		return result;
+	}
 
-        return result;
-    }
+	@Override
+	public List<MissionExpense> findMissions(int year) {
+		List<MissionExpense> result = new ArrayList<>();
 
-    @Override
-    public void saveStudent(Student student) {
-        Objects.requireNonNull(student, "student must not be null");
+		for (MissionExpense mission : missions) {
+			if (mission.getExpenseDate().getYear() == year) {
+				result.add(mission);
+			}
+		}
 
-        for (Student existing : students) {
-            if (existing.getStudentId().equals(student.getStudentId())) {
-                throw new IllegalArgumentException(
-                        "This list already exists.");
-            }
-        }
+		return result;
+	}
 
-        students.add(student);
-        writeStudents();
-    }
+	@Override
+	public void saveStudent(Student student) {
+		Objects.requireNonNull(student, "student must not be null");
 
-    @Override
-    public void savePayment(MonthlyPayment payment) {
-        payments.add(Objects.requireNonNull(
-                payment, "payment must not be null"));
+		for (Student existing : students) {
+			if (existing.getStudentId().equals(student.getStudentId())) {
+				throw new IllegalArgumentException("This list already exists.");
+			}
+		}
 
-        writePayments();
-    }
+		students.add(student);
+		writeStudents();
+	}
 
-    @Override
-    public void saveMission(MissionExpense mission) {
-        missions.add(Objects.requireNonNull(
-                mission, "mission must not be null"));
+	@Override
+	public void savePayment(MonthlyPayment payment) {
+		payments.add(Objects.requireNonNull(payment, "payment must not be null"));
 
-        writeMissions();
-    }
+		writePayments();
+	}
 
-    private List<Student> readStudents() {
-        List<Student> result = new ArrayList<>();
+	@Override
+	public void saveMission(MissionExpense mission) {
+		missions.add(Objects.requireNonNull(mission, "mission must not be null"));
 
-        for (List<String> row : readCsv("students.csv")) {
-            if (row.get(0).equals("studentId")) {
-                continue; 
-            }
+		writeMissions();
+	}
+	@Override
+	public void deleteStudent(String studentId) {
+	    Objects.requireNonNull(studentId, "studentId must not be null");
 
-            requireColumns(row, 2);
-            result.add(new Student(row.get(1), row.get(0)));
-        }
+	    boolean removed = students.removeIf(
+	            student -> student.getStudentId().equals(studentId));
 
-        return result;
-    }
+	    if (!removed) {
+	        throw new IllegalArgumentException("ไม่พบรหัสนิสิตนี้");
+	    }
 
-    private List<MonthlyPayment> readPayments() {
-        List<MonthlyPayment> result = new ArrayList<>();
+	    writeStudents();
+	}
 
-        for (List<String> row : readCsv("payments.csv")) {
-            if (row.get(0).equals("studentId")) {
-                continue;
-            }
+	private List<Student> readStudents() {
+		List<Student> result = new ArrayList<>();
 
-            requireColumns(row, 4);
-            result.add(new MonthlyPayment(
-                    row.get(0),
-                    YearMonth.parse(row.get(1)),
-                    new BigDecimal(row.get(2)),
-                    LocalDate.parse(row.get(3))));
-        }
+		for (List<String> row : readCsv("students.csv")) {
+			if (row.get(0).equals("studentId")) {
+				continue;
+			}
 
-        return result;
-    }
+			requireColumns(row, 2);
+			result.add(new Student(row.get(1), row.get(0)));
+		}
 
-    private List<MissionExpense> readMissions() {
-        List<MissionExpense> result = new ArrayList<>();
+		return result;
+	}
 
-        for (List<String> row : readCsv("missions.csv")) {
-            if (row.get(0).equals("missionId")) {
-                continue;
-            }
+	private List<MonthlyPayment> readPayments() {
+		List<MonthlyPayment> result = new ArrayList<>();
 
-            requireColumns(row, 6);
-            result.add(new MissionExpense(
-                    row.get(0),
-                    row.get(1),
-                    row.get(2),
-                    row.get(3),
-                    new BigDecimal(row.get(4)),
-                    LocalDate.parse(row.get(5))));
-        }
+		for (List<String> row : readCsv("payments.csv")) {
+			if (row.get(0).equals("studentId")) {
+				continue;
+			}
 
-        return result;
-    }
+			requireColumns(row, 4);
+			result.add(new MonthlyPayment(row.get(0), YearMonth.parse(row.get(1)), new BigDecimal(row.get(2)),
+					LocalDate.parse(row.get(3))));
+		}
 
-    private List<List<String>> readCsv(String fileName) {
-        Path file = dataDirectory.resolve(fileName);
-        List<List<String>> rows = new ArrayList<>();
+		return result;
+	}
 
-        if (!Files.exists(file)) {
-            return rows;
-        }
+	private List<MissionExpense> readMissions() {
+		List<MissionExpense> result = new ArrayList<>();
 
-        try {
-            for (String line : Files.readAllLines(
-                    file, StandardCharsets.UTF_8)) {
-                if (!line.isBlank()) {
-                    rows.add(parseCsvLine(line));
-                }
-            }
-        } catch (IOException ex) {
-            throw new IllegalStateException(
-                    "Cannot Read File: " + file, ex);
-        }
+		for (List<String> row : readCsv("missions.csv")) {
+			if (row.get(0).equals("missionId")) {
+				continue;
+			}
 
-        return rows;
-    }
+			requireColumns(row, 6);
+			result.add(new MissionExpense(row.get(0), row.get(1), row.get(2), row.get(3), new BigDecimal(row.get(4)),
+					LocalDate.parse(row.get(5))));
+		}
 
-    private List<String> parseCsvLine(String line) {
-        List<String> fields = new ArrayList<>();
-        StringBuilder field = new StringBuilder();
-        boolean insideQuotes = false;
+		return result;
+	}
 
-        for (int i = 0; i < line.length(); i++) {
-            char current = line.charAt(i);
+	private List<List<String>> readCsv(String fileName) {
+		Path file = dataDirectory.resolve(fileName);
+		List<List<String>> rows = new ArrayList<>();
 
-            if (current == '"') {
-                if (insideQuotes
-                        && i + 1 < line.length()
-                        && line.charAt(i + 1) == '"') {
-                    field.append('"');
-                    i++;
-                } else {
-                    insideQuotes = !insideQuotes;
-                }
-            } else if (current == ',' && !insideQuotes) {
-                fields.add(field.toString());
-                field.setLength(0);
-            } else {
-                field.append(current);
-            }
-        }
+		if (!Files.exists(file)) {
+			return rows;
+		}
 
-        fields.add(field.toString());
+		try {
+			for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+				if (!line.isBlank()) {
+					rows.add(parseCsvLine(line));
+				}
+			}
+		} catch (IOException ex) {
+			throw new IllegalStateException("Cannot Read File: " + file, ex);
+		}
 
-        if (!fields.isEmpty() && fields.get(0).startsWith("\uFEFF")) {
-            fields.set(0, fields.get(0).substring(1));
-        }
+		return rows;
+	}
 
-        return fields;
-    }
+	private List<String> parseCsvLine(String line) {
+		List<String> fields = new ArrayList<>();
+		StringBuilder field = new StringBuilder();
+		boolean insideQuotes = false;
 
-    private String csv(String value) {
-        
-        String singleLine = value
-                .replace("\r", " ")
-                .replace("\n", " ");
+		for (int i = 0; i < line.length(); i++) {
+			char current = line.charAt(i);
 
-        return "\"" + singleLine.replace("\"", "\"\"") + "\"";
-    }
+			if (current == '"') {
+				if (insideQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+					field.append('"');
+					i++;
+				} else {
+					insideQuotes = !insideQuotes;
+				}
+			} else if (current == ',' && !insideQuotes) {
+				fields.add(field.toString());
+				field.setLength(0);
+			} else {
+				field.append(current);
+			}
+		}
 
-    private void writeStudents() {
-        List<String> lines = new ArrayList<>();
-        lines.add("\uFEFFstudentId,name");
+		fields.add(field.toString());
 
-        for (Student student : students) {
-            lines.add(csv(student.getStudentId())
-                    + "," + csv(student.getName()));
-        }
+		if (!fields.isEmpty() && fields.get(0).startsWith("\uFEFF")) {
+			fields.set(0, fields.get(0).substring(1));
+		}
 
-        writeCsv("students.csv", lines);
-    }
+		return fields;
+	}
 
-    private void writePayments() {
-        List<String> lines = new ArrayList<>();
-        lines.add("\uFEFFstudentId,period,amount,receivedDate");
+	private String csv(String value) {
 
-        for (MonthlyPayment payment : payments) {
-            lines.add(csv(payment.getStudentId())
-                    + "," + csv(payment.getPeriod().toString())
-                    + "," + csv(payment.getAmount().toPlainString())
-                    + "," + csv(payment.getReceivedDate().toString()));
-        }
+		String singleLine = value.replace("\r", " ").replace("\n", " ");
 
-        writeCsv("payments.csv", lines);
-    }
+		return "\"" + singleLine.replace("\"", "\"\"") + "\"";
+	}
 
-    private void writeMissions() {
-        List<String> lines = new ArrayList<>();
-        lines.add("\uFEFFmissionId,activityName,category,detail,amount,expenseDate");
+	private void writeStudents() {
+		List<String> lines = new ArrayList<>();
+		lines.add("\uFEFFstudentId,name");
 
-        for (MissionExpense mission : missions) {
-            lines.add(csv(mission.getMissionId())
-                    + "," + csv(mission.getActivityName())
-                    + "," + csv(mission.getCategory())
-                    + "," + csv(mission.getDetail())
-                    + "," + csv(mission.getAmount().toPlainString())
-                    + "," + csv(mission.getExpenseDate().toString()));
-        }
+		for (Student student : students) {
+			lines.add(csv(student.getStudentId()) + "," + csv(student.getName()));
+		}
 
-        writeCsv("missions.csv", lines);
-    }
+		writeCsv("students.csv", lines);
+	}
 
-    private void writeCsv(String fileName, List<String> lines) {
-        try {
-            Files.createDirectories(dataDirectory);
+	private void writePayments() {
+		List<String> lines = new ArrayList<>();
+		lines.add("\uFEFFstudentId,period,amount,receivedDate");
 
-            Files.write(
-                    dataDirectory.resolve(fileName),
-                    lines,
-                    StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.TRUNCATE_EXISTING);
-        } catch (IOException ex) {
-            throw new IllegalStateException(
-                    "Cannot Save file: " + fileName, ex);
-        }
-    }
+		for (MonthlyPayment payment : payments) {
+			lines.add(csv(payment.getStudentId()) + "," + csv(payment.getPeriod().toString()) + ","
+					+ csv(payment.getAmount().toPlainString()) + "," + csv(payment.getReceivedDate().toString()));
+		}
 
-    private void requireColumns(List<String> row, int expectedCount) {
-        if (row.size() != expectedCount) {
-            throw new IllegalStateException(
-                    "Row is Wrong: " + row);
-        }
-    }
+		writeCsv("payments.csv", lines);
+	}
+
+	private void writeMissions() {
+		List<String> lines = new ArrayList<>();
+		lines.add("\uFEFFmissionId,activityName,category,detail,amount,expenseDate");
+
+		for (MissionExpense mission : missions) {
+			lines.add(csv(mission.getMissionId()) + "," + csv(mission.getActivityName()) + ","
+					+ csv(mission.getCategory()) + "," + csv(mission.getDetail()) + ","
+					+ csv(mission.getAmount().toPlainString()) + "," + csv(mission.getExpenseDate().toString()));
+		}
+
+		writeCsv("missions.csv", lines);
+	}
+
+	private void writeCsv(String fileName, List<String> lines) {
+		try {
+			Files.createDirectories(dataDirectory);
+
+			Files.write(dataDirectory.resolve(fileName), lines, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+					StandardOpenOption.TRUNCATE_EXISTING);
+		} catch (IOException ex) {
+			throw new IllegalStateException("Cannot Save file: " + fileName, ex);
+		}
+	}
+
+	private void requireColumns(List<String> row, int expectedCount) {
+		if (row.size() != expectedCount) {
+			throw new IllegalStateException("Row is Wrong: " + row);
+		}
+	}
 }

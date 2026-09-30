@@ -15,4 +15,6 @@ public interface FundRepository {
     void saveMission(MissionExpense mission);
     
     void saveStudent(Student student);
+    
+    void deleteStudent(String studentId);
 }

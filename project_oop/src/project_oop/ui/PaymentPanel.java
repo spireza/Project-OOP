@@ -55,6 +55,9 @@ public class PaymentPanel extends JPanel {
 		topPanel.add(monthlyAmountField);
 
 		JButton addStudentButton = new JButton("Add Student");
+		JButton deleteStudentButton = new JButton("Delete Student");
+		deleteStudentButton.addActionListener(e -> deleteSelectedStudent());
+		topPanel.add(deleteStudentButton);
 		addStudentButton.addActionListener(e -> addStudent());
 		topPanel.add(addStudentButton);
 		add(topPanel, BorderLayout.NORTH);
@@ -87,12 +90,50 @@ public class PaymentPanel extends JPanel {
 
 		centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
 		paymentTable.getColumnModel().getColumn(0).setCellRenderer(centerRenderer);
+		paymentTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
 
+		paymentTable.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
 		tableModel.addTableModelListener(event -> handleTableChange(event));
 		add(new JScrollPane(paymentTable), BorderLayout.CENTER);
 
 		yearComboBox.addActionListener(e -> loadStudents());
 		loadStudents();
+	}
+	private void deleteSelectedStudent() {
+	    int selectedViewRow = paymentTable.getSelectedRow();
+
+	    if (selectedViewRow < 0) {
+	        JOptionPane.showMessageDialog(
+	                this,
+	                "Please Click Column Student-ID",
+	                "Notify",
+	                JOptionPane.WARNING_MESSAGE);
+	        return;
+	    }
+
+	    int selectedRow =
+	            paymentTable.convertRowIndexToModel(selectedViewRow);
+
+	    // 
+	    String studentId = (String) tableModel.getValueAt(selectedRow, 1);
+
+	    int confirm = JOptionPane.showConfirmDialog(
+	            this,
+	            "Do you want Delete " + studentId + " Yes Or NO",
+	            "Confirm",
+	            JOptionPane.YES_NO_OPTION,
+	            JOptionPane.WARNING_MESSAGE);
+
+	    if (confirm != JOptionPane.YES_OPTION) {
+	        return;
+	    }
+
+	    try {
+	        repository.deleteStudent(studentId);
+	        loadStudents();
+	    } catch (RuntimeException ex) {
+	        showError(ex.getMessage());
+	    }
 	}
 
 	private void addStudent() {

@@ -60,5 +60,17 @@ public class InMemoryFundRepository implements FundRepository {
 	public void saveStudent(Student student) {
 		 students.add(Objects.requireNonNull(student, "student is not be null"));
 	}
+	
+	@Override
+	public void deleteStudent(String studentId) {
+	    Objects.requireNonNull(studentId, "studentId must not be null");
+
+	    boolean removed = students.removeIf(
+	            student -> student.getStudentId().equals(studentId));
+
+	    if (!removed) {
+	        throw new IllegalArgumentException("ไม่พบรหัสนิสิตนี้");
+	    }
+	}
 
 }

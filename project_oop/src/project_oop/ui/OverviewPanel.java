@@ -91,17 +91,20 @@ public class OverviewPanel extends JPanel {
 		JTable paymentTable = new JTable(tableModel);
 		paymentTable.setRowHeight(28);
 		paymentTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
-		
+
 		DefaultTableCellRenderer numberRenderer = new DefaultTableCellRenderer();
 		numberRenderer.setHorizontalAlignment(SwingConstants.CENTER);
 		paymentTable.getColumnModel().getColumn(0).setCellRenderer(numberRenderer);
 		setColumnWidths(paymentTable);
-		
-		
+
 		DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
 		centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+		
 		paymentTable.getColumnModel().getColumn(0).setCellRenderer(centerRenderer);
 		add(new JScrollPane(paymentTable), BorderLayout.CENTER);
+		
+		paymentTable.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
+		paymentTable.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
 
 		yearComboBox.addActionListener(e -> refreshData());
 		refreshData();
