@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 
 import java.awt.FlowLayout;
+import java.awt.Insets;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Arrays;
@@ -73,7 +74,7 @@ public class PaymentPanel extends JPanel {
 		setLayout(new BorderLayout(10, 10));
 
 		JPanel topPanel = new JPanel(new BorderLayout());
-		JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+		JPanel controlsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
 		controlsPanel.add(new JLabel("Year"));
 
 		yearComboBox = new JComboBox<>(new Integer[] { 2568, 2569, 2570 });
@@ -88,6 +89,11 @@ public class PaymentPanel extends JPanel {
 		JButton checkButton = new JButton("Check");
 		cleanButton = new JButton("Clean");
 		cleanButton.setToolTipText("Click a month header, then click Clean to remove that month's data");
+		Insets compactButtonMargin = new Insets(3, 6, 3, 6);
+		deleteStudentButton.setMargin(compactButtonMargin);
+		addStudentButton.setMargin(compactButtonMargin);
+		checkButton.setMargin(compactButtonMargin);
+		cleanButton.setMargin(compactButtonMargin);
 		deleteStudentButton.addActionListener(e -> deleteSelectedStudent());
 		controlsPanel.add(deleteStudentButton);
 		addStudentButton.addActionListener(e -> addStudent());
@@ -98,9 +104,9 @@ public class PaymentPanel extends JPanel {
 		controlsPanel.add(cleanButton);
 		topPanel.add(controlsPanel, BorderLayout.WEST);
 
-		JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+		JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 2, 0));
 		searchPanel.add(new JLabel("Search:"));
-		JTextField searchField = new JTextField(18);
+		JTextField searchField = new JTextField(12);
 		searchPanel.add(searchField);
 		topPanel.add(searchPanel, BorderLayout.EAST);
 		add(topPanel, BorderLayout.NORTH);
