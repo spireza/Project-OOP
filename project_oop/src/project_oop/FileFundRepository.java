@@ -9,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class FileFundRepository implements FundRepository {
@@ -81,6 +83,43 @@ public class FileFundRepository implements FundRepository {
     }
 
     @Override
+    public void deletePayment(String studentId, YearMonth period) {
+        Objects.requireNonNull(studentId, "studentId must not be null");
+        Objects.requireNonNull(period, "period must not be null");
+        boolean removed = data.payments.removeIf(payment -> payment.getStudentId().equals(studentId)
+                && payment.getPeriod().equals(period));
+        if (!removed) {
+            throw new IllegalArgumentException("ไม่พบรายการชำระของเดือนนี้");
+        }
+        saveData();
+    }
+
+    @Override
+    public int deletePayments(YearMonth period) {
+        Objects.requireNonNull(period, "period must not be null");
+        int originalSize = data.payments.size();
+        data.payments.removeIf(payment -> payment.getPeriod().equals(period));
+        int deletedCount = originalSize - data.payments.size();
+        if (deletedCount > 0) {
+            saveData();
+        }
+        return deletedCount;
+    }
+
+    @Override
+    public String findPaymentDetail(String studentId, int year) {
+        return getPaymentDetails().getOrDefault(paymentDetailKey(studentId, year), "");
+    }
+
+    @Override
+    public void savePaymentDetail(String studentId, int year, String detail) {
+        Objects.requireNonNull(studentId, "studentId must not be null");
+        getPaymentDetails().put(paymentDetailKey(studentId, year),
+                Objects.requireNonNull(detail, "detail must not be null"));
+        saveData();
+    }
+
+    @Override
     public void saveMission(MissionExpense mission) {
         data.missions.add(
                 Objects.requireNonNull(mission, "mission must not be null"));
@@ -136,7 +175,21 @@ public class FileFundRepository implements FundRepository {
         private final List<Student> students = new ArrayList<>();
         private final List<MonthlyPayment> payments = new ArrayList<>();
         private final List<MissionExpense> missions = new ArrayList<>();
+        private Map<String, String> paymentDetails = new HashMap<>();
     }
+
+    private String paymentDetailKey(String studentId, int year) {
+        return year + "|" + studentId;
+    }
+
+    private Map<String, String> getPaymentDetails() {
+        // ค่า null อาจเกิดเมื่ออ่านไฟล์ที่สร้างจาก FundData เวอร์ชันเก่า
+        if (data.paymentDetails == null) {
+            data.paymentDetails = new HashMap<>();
+        }
+        return data.paymentDetails;
+    }
+
     @Override
     public void deleteStudent(String studentId) {
         Objects.requireNonNull(studentId, "studentId must not be null");
@@ -147,6 +200,8 @@ public class FileFundRepository implements FundRepository {
         if (!removed) {
             throw new IllegalArgumentException("ไม่พบรหัสนิสิตนี้");
         }
+
+        getPaymentDetails().keySet().removeIf(key -> key.endsWith("|" + studentId));
 
         saveData();
     }

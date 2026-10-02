@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CsvFundRepository implements FundRepository {
 
@@ -20,6 +22,7 @@ public class CsvFundRepository implements FundRepository {
 	private final List<Student> students = new ArrayList<>();
 	private final List<MonthlyPayment> payments = new ArrayList<>();
 	private final List<MissionExpense> missions = new ArrayList<>();
+	private final Map<String, String> paymentDetails = new HashMap<>();
 
 	public CsvFundRepository() {
 		this(Path.of("data"));
@@ -31,6 +34,7 @@ public class CsvFundRepository implements FundRepository {
 		students.addAll(readStudents());
 		payments.addAll(readPayments());
 		missions.addAll(readMissions());
+		paymentDetails.putAll(readPaymentDetails());
 	}
 
 	@Override
@@ -91,6 +95,43 @@ public class CsvFundRepository implements FundRepository {
 	}
 
 	@Override
+	public void deletePayment(String studentId, YearMonth period) {
+		Objects.requireNonNull(studentId, "studentId must not be null");
+		Objects.requireNonNull(period, "period must not be null");
+		boolean removed = payments.removeIf(payment -> payment.getStudentId().equals(studentId)
+				&& payment.getPeriod().equals(period));
+		if (!removed) {
+			throw new IllegalArgumentException("ไม่พบรายการชำระของเดือนนี้");
+		}
+		writePayments();
+	}
+
+	@Override
+	public int deletePayments(YearMonth period) {
+		Objects.requireNonNull(period, "period must not be null");
+		int originalSize = payments.size();
+		payments.removeIf(payment -> payment.getPeriod().equals(period));
+		int deletedCount = originalSize - payments.size();
+		if (deletedCount > 0) {
+			writePayments();
+		}
+		return deletedCount;
+	}
+
+	@Override
+	public String findPaymentDetail(String studentId, int year) {
+		return paymentDetails.getOrDefault(paymentDetailKey(studentId, year), "");
+	}
+
+	@Override
+	public void savePaymentDetail(String studentId, int year, String detail) {
+		Objects.requireNonNull(studentId, "studentId must not be null");
+		Objects.requireNonNull(detail, "detail must not be null");
+		paymentDetails.put(paymentDetailKey(studentId, year), detail);
+		writePaymentDetails();
+	}
+
+	@Override
 	public void saveMission(MissionExpense mission) {
 		missions.add(Objects.requireNonNull(mission, "mission must not be null"));
 
@@ -106,8 +147,14 @@ public class CsvFundRepository implements FundRepository {
 	    if (!removed) {
 	        throw new IllegalArgumentException("ไม่พบรหัสนิสิตนี้");
 	    }
+	    paymentDetails.keySet().removeIf(key -> key.endsWith("|" + studentId));
 
 	    writeStudents();
+	    writePaymentDetails();
+	}
+
+	private String paymentDetailKey(String studentId, int year) {
+		return year + "|" + studentId;
 	}
 
 	private List<Student> readStudents() {
@@ -138,6 +185,18 @@ public class CsvFundRepository implements FundRepository {
 					LocalDate.parse(row.get(3))));
 		}
 
+		return result;
+	}
+
+	private Map<String, String> readPaymentDetails() {
+		Map<String, String> result = new HashMap<>();
+		for (List<String> row : readCsv("payment-details.csv")) {
+			if (row.get(0).equals("studentId")) {
+				continue;
+			}
+			requireColumns(row, 3);
+			result.put(paymentDetailKey(row.get(0), Integer.parseInt(row.get(1))), row.get(2));
+		}
 		return result;
 	}
 
@@ -238,6 +297,16 @@ public class CsvFundRepository implements FundRepository {
 		}
 
 		writeCsv("payments.csv", lines);
+	}
+
+	private void writePaymentDetails() {
+		List<String> lines = new ArrayList<>();
+		lines.add("\uFEFFstudentId,year,detail");
+		for (Map.Entry<String, String> entry : paymentDetails.entrySet()) {
+			String[] key = entry.getKey().split("\\|", 2);
+			lines.add(csv(key[1]) + "," + csv(key[0]) + "," + csv(entry.getValue()));
+		}
+		writeCsv("payment-details.csv", lines);
 	}
 
 	private void writeMissions() {

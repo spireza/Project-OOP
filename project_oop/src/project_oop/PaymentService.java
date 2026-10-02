@@ -65,5 +65,18 @@ public class PaymentService {
 		repository.savePayment(newPayment);
 	}
 
+	public void cancelReceived(String studentId, YearMonth month) {
+		if (studentId == null || studentId.isBlank()) {
+			throw new IllegalArgumentException("Student ID must not be empty");
+		}
+		Objects.requireNonNull(month, "month must not be null");
+		repository.deletePayment(studentId, month);
+	}
+
+	public int clearMonth(YearMonth month) {
+		Objects.requireNonNull(month, "month must not be null");
+		return repository.deletePayments(month);
+	}
+
 
 }

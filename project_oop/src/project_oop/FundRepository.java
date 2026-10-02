@@ -10,7 +10,15 @@ public interface FundRepository {
 
     List<MissionExpense> findMissions(int year);
 
-    void savePayment(MonthlyPayment payment);
+	void savePayment(MonthlyPayment payment);
+
+	void deletePayment(String studentId, java.time.YearMonth period);
+
+	int deletePayments(java.time.YearMonth period);
+
+	String findPaymentDetail(String studentId, int year);
+
+	void savePaymentDetail(String studentId, int year, String detail);
 
     void saveMission(MissionExpense mission);
     
