@@ -21,6 +21,10 @@ public interface FundRepository {
 	void savePaymentDetail(String studentId, int year, String detail);
 
     void saveMission(MissionExpense mission);
+
+    void updateMission(MissionExpense mission);
+
+    void deleteMission(String missionId);
     
     void saveStudent(Student student);
     

@@ -96,6 +96,27 @@ public class InMemoryFundRepository implements FundRepository {
 	}
 
 	@Override
+	public void updateMission(MissionExpense updatedMission) {
+		Objects.requireNonNull(updatedMission, "mission must not be null");
+		for (int index = 0; index < mission.size(); index++) {
+			if (mission.get(index).getMissionId().equals(updatedMission.getMissionId())) {
+				mission.set(index, updatedMission);
+				return;
+			}
+		}
+		throw new IllegalArgumentException("ไม่พบรายการ Mission ที่ต้องการแก้ไข");
+	}
+
+	@Override
+	public void deleteMission(String missionId) {
+		Objects.requireNonNull(missionId, "missionId must not be null");
+		boolean removed = mission.removeIf(item -> item.getMissionId().equals(missionId));
+		if (!removed) {
+			throw new IllegalArgumentException("ไม่พบรายการ Mission ที่ต้องการลบ");
+		}
+	}
+
+	@Override
 	public void saveStudent(Student student) {
 		 students.add(Objects.requireNonNull(student, "student is not be null"));
 	}

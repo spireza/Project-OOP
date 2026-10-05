@@ -47,6 +47,11 @@ public class MissionPanel extends JPanel {
 	private final JTextArea detailArea;
 
 	private final DefaultListModel<String> historyModel;
+	private final JList<String> historyList;
+	private final JButton saveButton;
+	private final JButton cancelEditButton;
+	private final List<MissionExpense> historyExpenses = new java.util.ArrayList<>();
+	private String editingMissionId;
 	private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/uuuu");
 
 	public MissionPanel(FundRepository repository) {
@@ -143,17 +148,24 @@ public class MissionPanel extends JPanel {
 		detailConstraints.insets = new Insets(0, 0, 8, 0);
 		fieldPanel.add(detailPanel, detailConstraints);
 
-		JButton saveButton = new JButton("Save");
+		saveButton = new JButton("Save");
 		saveButton.setBackground(new Color(23, 103, 71));
 		saveButton.setForeground(Color.WHITE);
 		saveButton.setFocusPainted(false);
 		saveButton.addActionListener(e -> saveExpense());
+		cancelEditButton = new JButton("Cancel edit");
+		cancelEditButton.setVisible(false);
+		cancelEditButton.addActionListener(e -> clearForm());
+		JPanel formActions = new JPanel(new BorderLayout(8, 0));
+		formActions.setOpaque(false);
+		formActions.add(saveButton, BorderLayout.CENTER);
+		formActions.add(cancelEditButton, BorderLayout.EAST);
 
 		formPanel.add(fieldPanel, BorderLayout.CENTER);
-		formPanel.add(saveButton, BorderLayout.SOUTH);
+		formPanel.add(formActions, BorderLayout.SOUTH);
 
 		historyModel = new DefaultListModel<>();
-		JList<String> historyList = new JList<>(historyModel);
+		historyList = new JList<>(historyModel);
 
 		JPanel historyPanel = new JPanel(new BorderLayout(8, 8));
 		historyPanel.setBackground(Color.WHITE);
@@ -162,6 +174,15 @@ public class MissionPanel extends JPanel {
 				BorderFactory.createEmptyBorder(16, 16, 16, 16)));
 		historyPanel.add(new JLabel("History:"), BorderLayout.NORTH);
 		historyPanel.add(new JScrollPane(historyList), BorderLayout.CENTER);
+		JPanel historyActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+		historyActions.setOpaque(false);
+		JButton editButton = new JButton("Edit selected");
+		JButton deleteButton = new JButton("Delete selected");
+		editButton.addActionListener(e -> editSelectedExpense());
+		deleteButton.addActionListener(e -> deleteSelectedExpense());
+		historyActions.add(editButton);
+		historyActions.add(deleteButton);
+		historyPanel.add(historyActions, BorderLayout.SOUTH);
 
 		JPanel contentPanel = new JPanel(new GridLayout(1, 2, 10, 10));
 		contentPanel.setOpaque(false);
@@ -215,12 +236,19 @@ public class MissionPanel extends JPanel {
 
 			LocalDate expenseDate = LocalDate.parse(dateField.getText().trim(), dateFormatter);
 
-			MissionExpense expense = new MissionExpense(UUID.randomUUID().toString(), activityname, category, detail,
-					amount, expenseDate);
+			boolean editing = editingMissionId != null;
+			MissionExpense expense = new MissionExpense(
+					editing ? editingMissionId : UUID.randomUUID().toString(),
+					activityname, category, detail, amount, expenseDate);
 
-			missionService.recordExpense(expense);
+			if (editing) {
+				missionService.updateExpense(expense);
+			} else {
+				missionService.recordExpense(expense);
+			}
 
-			JOptionPane.showMessageDialog(this, "Save !!", "Success!!", JOptionPane.INFORMATION_MESSAGE);
+			JOptionPane.showMessageDialog(this, editing ? "Mission updated." : "Mission saved.",
+					"Success", JOptionPane.INFORMATION_MESSAGE);
 			clearForm();
 			loadingHistory();
 
@@ -233,6 +261,7 @@ public class MissionPanel extends JPanel {
 
 	private void loadingHistory() {
 		historyModel.clear();
+		historyExpenses.clear();
 
 		int buddhistYear = (Integer) yearComboBox.getSelectedItem();
 		int christianYear = buddhistYear - 543;
@@ -240,9 +269,57 @@ public class MissionPanel extends JPanel {
 		List<MissionExpense> expenses = repository.findMissions(christianYear);
 
 		for (MissionExpense expense : expenses) {
+			historyExpenses.add(expense);
 			String item = String.format("%s | %s | %s | %s Bath", expense.getExpenseDate().format(dateFormatter),
 					expense.getActivityName(), expense.getCategory(), expense.getAmount().toPlainString());
 			historyModel.addElement(item);
+		}
+	}
+
+	private void editSelectedExpense() {
+		int selectedIndex = historyList.getSelectedIndex();
+		if (selectedIndex < 0 || selectedIndex >= historyExpenses.size()) {
+			JOptionPane.showMessageDialog(this, "Select a Mission from History first.", "Select Mission",
+					JOptionPane.INFORMATION_MESSAGE);
+			return;
+		}
+
+		MissionExpense expense = historyExpenses.get(selectedIndex);
+		editingMissionId = expense.getMissionId();
+		activityNameField.setText(expense.getActivityName());
+		amountField.setText(expense.getAmount().toPlainString());
+		dateField.setText(expense.getExpenseDate().format(dateFormatter));
+		categoryComboBox.setSelectedItem(expense.getCategory());
+		detailArea.setText(expense.getDetail());
+		saveButton.setText("Update Mission");
+		cancelEditButton.setVisible(true);
+		activityNameField.requestFocusInWindow();
+	}
+
+	private void deleteSelectedExpense() {
+		int selectedIndex = historyList.getSelectedIndex();
+		if (selectedIndex < 0 || selectedIndex >= historyExpenses.size()) {
+			JOptionPane.showMessageDialog(this, "Select a Mission from History first.", "Select Mission",
+					JOptionPane.INFORMATION_MESSAGE);
+			return;
+		}
+
+		MissionExpense expense = historyExpenses.get(selectedIndex);
+		int confirm = JOptionPane.showConfirmDialog(this,
+				"Delete '" + expense.getActivityName() + "' (" + expense.getAmount().toPlainString() + " Bath)?",
+				"Confirm delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+		if (confirm != JOptionPane.YES_OPTION) {
+			return;
+		}
+
+		try {
+			missionService.deleteExpense(expense.getMissionId());
+			if (expense.getMissionId().equals(editingMissionId)) {
+				clearForm();
+			}
+			loadingHistory();
+		} catch (RuntimeException ex) {
+			showERROR(ex.getMessage());
 		}
 	}
 
@@ -252,6 +329,9 @@ public class MissionPanel extends JPanel {
 		dateField.setText(LocalDate.now().format(dateFormatter));
 		detailArea.setText("");
 		categoryComboBox.setSelectedIndex(0);
+		editingMissionId = null;
+		saveButton.setText("Save");
+		cancelEditButton.setVisible(false);
 	}
 
 	private void showERROR(String message) {

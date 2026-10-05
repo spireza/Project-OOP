@@ -27,4 +27,16 @@ public class MissionService {
 		repository.saveMission(expense);
 	}
 
+	public void updateExpense(MissionExpense expense) {
+		Objects.requireNonNull(expense, "Expense is not be null");
+		repository.updateMission(expense);
+	}
+
+	public void deleteExpense(String missionId) {
+		if (missionId == null || missionId.isBlank()) {
+			throw new IllegalArgumentException("Mission ID must not be empty");
+		}
+		repository.deleteMission(missionId);
+	}
+
 }

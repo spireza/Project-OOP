@@ -137,6 +137,29 @@ public class CsvFundRepository implements FundRepository {
 
 		writeMissions();
 	}
+
+	@Override
+	public void updateMission(MissionExpense updatedMission) {
+		Objects.requireNonNull(updatedMission, "mission must not be null");
+		for (int index = 0; index < missions.size(); index++) {
+			if (missions.get(index).getMissionId().equals(updatedMission.getMissionId())) {
+				missions.set(index, updatedMission);
+				writeMissions();
+				return;
+			}
+		}
+		throw new IllegalArgumentException("ไม่พบรายการ Mission ที่ต้องการแก้ไข");
+	}
+
+	@Override
+	public void deleteMission(String missionId) {
+		Objects.requireNonNull(missionId, "missionId must not be null");
+		boolean removed = missions.removeIf(mission -> mission.getMissionId().equals(missionId));
+		if (!removed) {
+			throw new IllegalArgumentException("ไม่พบรายการ Mission ที่ต้องการลบ");
+		}
+		writeMissions();
+	}
 	@Override
 	public void deleteStudent(String studentId) {
 	    Objects.requireNonNull(studentId, "studentId must not be null");

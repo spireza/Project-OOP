@@ -126,6 +126,29 @@ public class FileFundRepository implements FundRepository {
         saveData();
     }
 
+    @Override
+    public void updateMission(MissionExpense updatedMission) {
+        Objects.requireNonNull(updatedMission, "mission must not be null");
+        for (int index = 0; index < data.missions.size(); index++) {
+            if (data.missions.get(index).getMissionId().equals(updatedMission.getMissionId())) {
+                data.missions.set(index, updatedMission);
+                saveData();
+                return;
+            }
+        }
+        throw new IllegalArgumentException("ไม่พบรายการ Mission ที่ต้องการแก้ไข");
+    }
+
+    @Override
+    public void deleteMission(String missionId) {
+        Objects.requireNonNull(missionId, "missionId must not be null");
+        boolean removed = data.missions.removeIf(mission -> mission.getMissionId().equals(missionId));
+        if (!removed) {
+            throw new IllegalArgumentException("ไม่พบรายการ Mission ที่ต้องการลบ");
+        }
+        saveData();
+    }
+
     private FundData loadData() {
         if (!Files.exists(dataFile)) {
             return new FundData();
