@@ -5,14 +5,19 @@ import java.awt.Component;
 
 import java.awt.FlowLayout;
 import java.awt.Insets;
+import java.awt.Color;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.prefs.Preferences;
 import java.util.prefs.BackingStoreException;
-import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -24,6 +29,7 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.RowFilter;
+import javax.swing.BorderFactory;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.TableModelEvent;
@@ -32,14 +38,16 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableRowSorter;
+import javax.swing.SwingConstants;
 
 import project_oop.FundRepository;
 import project_oop.MonthlyPayment;
 import project_oop.PaymentService;
 import project_oop.Student;
-import javax.swing.SwingConstants;
 
 public class PaymentPanel extends JPanel {
+	private static final int PAGE_SIZE = 20;
+	private static final int MAX_VISIBLE_PAGE_BUTTONS = 3;
 	private static final Preferences UI_PREFERENCES = Preferences.userNodeForPackage(PaymentPanel.class);
 	private static final String PREF_YEAR = "payment.selectedYear";
 	private static final String PREF_MONTHS = "payment.displayedMonths";
@@ -63,6 +71,11 @@ public class PaymentPanel extends JPanel {
 	private int selectedMonth = -1;
 	private int selectedCleanMonth = -1;
 	private final JButton cleanButton;
+	private final JPanel paginationPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 4));
+	private final JLabel pageInfoLabel = new JLabel(" ");
+	private final TableRowSorter<DefaultTableModel> rowSorter;
+	private String searchQuery = "";
+	private int currentPage;
 
 	private boolean loadingTable;
 
@@ -172,7 +185,7 @@ public class PaymentPanel extends JPanel {
 
 		paymentTable.getColumnModel().getColumn(2).setCellRenderer(centerRenderer);
 
-		TableRowSorter<DefaultTableModel> rowSorter = new TableRowSorter<>(tableModel);
+		rowSorter = new TableRowSorter<>(tableModel);
 		// Clicking a month header selects it for Clean; don't let that click sort
 		// the payment column and unexpectedly reorder students.
 		for (int column = 3; column <= 14; column++) {
@@ -181,13 +194,9 @@ public class PaymentPanel extends JPanel {
 		paymentTable.setRowSorter(rowSorter);
 		searchField.getDocument().addDocumentListener(new DocumentListener() {
 			private void filterStudents() {
-				String query = searchField.getText().trim();
-				if (query.isEmpty()) {
-					rowSorter.setRowFilter(null);
-				} else {
-					// ค้นหาข้อความบางส่วนได้ทั้งคอลัมน์ Student-ID และ Name
-					rowSorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(query), 1, 2));
-				}
+				searchQuery = searchField.getText().trim();
+				currentPage = 0;
+				refreshTableFilter();
 			}
 
 			@Override
@@ -221,7 +230,14 @@ public class PaymentPanel extends JPanel {
 				paymentTable,
 				JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
 				JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		add(tableScrollPane, BorderLayout.CENTER);
+		JPanel tablePanel = new JPanel(new BorderLayout());
+		tablePanel.add(tableScrollPane, BorderLayout.CENTER);
+		paginationPanel.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+		JPanel paginationContainer = new JPanel(new BorderLayout());
+		paginationContainer.add(pageInfoLabel, BorderLayout.WEST);
+		paginationContainer.add(paginationPanel, BorderLayout.CENTER);
+		tablePanel.add(paginationContainer, BorderLayout.SOUTH);
+		add(tablePanel, BorderLayout.CENTER);
 
 		restoreUiState();
 		yearComboBox.addActionListener(e -> {
@@ -298,6 +314,94 @@ public class PaymentPanel extends JPanel {
 		} catch (BackingStoreException ex) {
 			System.err.println("Could not save payment screen preferences: " + ex.getMessage());
 		}
+	}
+
+	private void refreshTableFilter() {
+		List<Integer> matchingRows = new ArrayList<>();
+		String normalizedQuery = searchQuery.toLowerCase(Locale.ROOT);
+		for (int row = 0; row < tableModel.getRowCount(); row++) {
+			String studentId = String.valueOf(tableModel.getValueAt(row, 1)).toLowerCase(Locale.ROOT);
+			String studentName = String.valueOf(tableModel.getValueAt(row, 2)).toLowerCase(Locale.ROOT);
+			if (normalizedQuery.isEmpty() || studentId.contains(normalizedQuery)
+					|| studentName.contains(normalizedQuery)) {
+				matchingRows.add(row);
+			}
+		}
+
+		int pageCount = Math.max(1, (matchingRows.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+		currentPage = Math.min(currentPage, pageCount - 1);
+		int firstRow = currentPage * PAGE_SIZE;
+		int lastRow = Math.min(firstRow + PAGE_SIZE, matchingRows.size());
+		HashSet<Integer> visibleRows = new HashSet<>(matchingRows.subList(firstRow, lastRow));
+		rowSorter.setRowFilter(new RowFilter<DefaultTableModel, Integer>() {
+			@Override
+			public boolean include(Entry<? extends DefaultTableModel, ? extends Integer> entry) {
+				return visibleRows.contains(entry.getIdentifier());
+			}
+		});
+		updatePagination(matchingRows.size(), pageCount, firstRow, lastRow);
+	}
+
+	private void updatePagination(int matchingCount, int pageCount, int firstRow, int lastRow) {
+		paginationPanel.removeAll();
+		pageInfoLabel.setText(matchingCount == 0 ? "No students found"
+				: "Showing " + (firstRow + 1) + "-" + lastRow + " of " + matchingCount);
+
+		JButton previousButton = new JButton("<");
+		previousButton.setMargin(new Insets(2, 8, 2, 8));
+		previousButton.setEnabled(currentPage > 0);
+		previousButton.addActionListener(event -> {
+			currentPage--;
+			refreshTableFilter();
+		});
+		paginationPanel.add(previousButton);
+
+		int firstVisible = Math.max(0, currentPage - 1);
+		int lastVisible = Math.min(pageCount - 1, firstVisible + MAX_VISIBLE_PAGE_BUTTONS - 1);
+		if (lastVisible == pageCount - 1) {
+			firstVisible = Math.max(0, lastVisible - MAX_VISIBLE_PAGE_BUTTONS + 1);
+		}
+		List<Integer> pageButtons = new ArrayList<>();
+		pageButtons.add(0);
+		for (int page = firstVisible; page <= lastVisible; page++) {
+			if (!pageButtons.contains(page)) {
+				pageButtons.add(page);
+			}
+		}
+		if (!pageButtons.contains(pageCount - 1)) {
+			pageButtons.add(pageCount - 1);
+		}
+		pageButtons.sort(Integer::compareTo);
+
+		int previousPage = -1;
+		for (int page : pageButtons) {
+			if (previousPage >= 0 && page - previousPage > 1) {
+				paginationPanel.add(new JLabel("…"));
+			}
+			JButton pageButton = new JButton(String.valueOf(page + 1));
+			pageButton.setMargin(new Insets(2, 9, 2, 9));
+			if (page == currentPage) {
+				pageButton.setForeground(new Color(230, 91, 22));
+				pageButton.setBorder(BorderFactory.createLineBorder(new Color(230, 91, 22), 2));
+			}
+			pageButton.addActionListener(event -> {
+				currentPage = page;
+				refreshTableFilter();
+			});
+			paginationPanel.add(pageButton);
+			previousPage = page;
+		}
+
+		JButton nextButton = new JButton(">");
+		nextButton.setMargin(new Insets(2, 8, 2, 8));
+		nextButton.setEnabled(currentPage < pageCount - 1);
+		nextButton.addActionListener(event -> {
+			currentPage++;
+			refreshTableFilter();
+		});
+		paginationPanel.add(nextButton);
+		paginationPanel.revalidate();
+		paginationPanel.repaint();
 	}
 
 	private void chooseMonthToCollect() {
@@ -587,7 +691,85 @@ public class PaymentPanel extends JPanel {
 			}
 		} finally {
 			loadingTable = false;
+			refreshTableFilter();
 		}
+	}
+
+	public void reloadStudents() {
+		currentPage = 0;
+		loadStudents();
+	}
+
+	public List<String> buildPaymentReportCsv() {
+		List<Integer> selectedMonths = new ArrayList<>();
+		for (int month = 0; month < displayedMonthColumns.length; month++) {
+			if (displayedMonthColumns[month]) {
+				selectedMonths.add(month);
+			}
+		}
+		if (selectedMonths.isEmpty()) {
+			throw new IllegalStateException("Select at least one collection month in List and Check first.");
+		}
+
+		int buddhistYear = (Integer) yearComboBox.getSelectedItem();
+		int christianYear = buddhistYear - 543;
+		Map<String, boolean[]> paidByStudent = new HashMap<>();
+		for (MonthlyPayment payment : repository.findPayments(christianYear)) {
+			paidByStudent.computeIfAbsent(payment.getStudentId(), ignored -> new boolean[12])
+					[payment.getPeriod().getMonthValue() - 1] = true;
+		}
+
+		List<String> rows = new ArrayList<>();
+		List<String> header = new ArrayList<>();
+		header.add("Academic Year");
+		header.add("Student-ID");
+		header.add("Name");
+		for (int month : selectedMonths) {
+			BigDecimal amount = monthlyAmounts[month];
+			header.add(amount == null ? MONTH_NAMES[month]
+					: MONTH_NAMES[month] + " (" + amount.stripTrailingZeros().toPlainString() + " Bath)");
+		}
+		header.add("Months Paid");
+		header.add("Months Required");
+		header.add("Status");
+		header.add("Missing Months");
+		header.add("Detail");
+		rows.add("\uFEFF" + csvRow(header));
+
+		for (Student student : repository.findAllStudents()) {
+			boolean[] studentPayments = paidByStudent.getOrDefault(student.getStudentId(), new boolean[12]);
+			int paidCount = 0;
+			List<String> missingMonths = new ArrayList<>();
+			List<String> row = new ArrayList<>();
+			row.add(String.valueOf(buddhistYear));
+			row.add(student.getStudentId());
+			row.add(student.getName());
+			for (int month : selectedMonths) {
+				if (studentPayments[month]) {
+					row.add("Paid");
+					paidCount++;
+				} else {
+					row.add("Missing");
+					missingMonths.add(MONTH_NAMES[month]);
+				}
+			}
+			row.add(String.valueOf(paidCount));
+			row.add(String.valueOf(selectedMonths.size()));
+			row.add(paidCount == selectedMonths.size() ? "Complete" : "Incomplete");
+			row.add(String.join("; ", missingMonths));
+			row.add(repository.findPaymentDetail(student.getStudentId(), christianYear));
+			rows.add(csvRow(row));
+		}
+		return rows;
+	}
+
+	private String csvRow(List<String> values) {
+		List<String> escaped = new ArrayList<>(values.size());
+		for (String value : values) {
+			String singleLine = value == null ? "" : value.replace("\r", " ").replace("\n", " ");
+			escaped.add("\"" + singleLine.replace("\"", "\"\"") + "\"");
+		}
+		return String.join(",", escaped);
 	}
 
 	private void openPaymentDetail(int modelRow) {

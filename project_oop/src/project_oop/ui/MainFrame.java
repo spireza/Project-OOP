@@ -33,15 +33,20 @@ public class MainFrame extends JFrame {
 		setSize(1000, 700);
 		setLocationRelativeTo(null);
 
-		tabs.addTab("List and Check", new PaymentPanel(repository));
+		PaymentPanel paymentPanel = new PaymentPanel(repository);
+		tabs.addTab("List and Check", paymentPanel);
 		tabs.addTab("View all", new OverviewPanel(reportService, repository));
 		tabs.addTab("Mission", new MissionPanel(repository));
+		tabs.addTab("File", new StudentCsvPanel(repository, paymentPanel::reloadStudents,
+				paymentPanel::buildPaymentReportCsv));
 
 		add(tabs, BorderLayout.CENTER);
 	}
 
 	private void applyApplicationFonts() {
-		Font regularFont = new Font("SansSerif", Font.PLAIN, 14);
+		// Tahoma includes Thai glyphs on Windows, unlike some logical-font mappings
+		// that can render imported Thai names as empty square boxes.
+		Font regularFont = new Font("Tahoma", Font.PLAIN, 14);
 		Font boldFont = regularFont.deriveFont(Font.BOLD);
 
 		// ฟอนต์หลักให้เหมือนกันทุกแท็บ
